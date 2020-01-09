@@ -1,0 +1,11 @@
+- hosts: clevando_instance
+  tasks:
+    - command: cowsay this is clevando_instance!
+
+- hosts: clevando_instance_1
+  tasks:
+    - command: cowsay this is clevando_instance_1!
+
+- hosts: clevando_instance_2
+  tasks:
+    - command: cowsay this is clevando_instance_2!
