@@ -14,12 +14,17 @@ variable "aws_region" {
   default = "eu-central-1"
 }
 
-variable "aws_ami" {
-  type = string
-  # la-fonciere-numerique
-  # default = "ami-087855b6c8b59a9e4"
-  # ops-zenika
-  default = "ami-0cc0a36f626a4fdf5"
+data "aws_ami" "latest-ubuntu" {
+  owners = ["099720109477"] # Canonical
+  most_recent = true
+  filter {
+      name   = "name"
+      values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
+  }
+  filter {
+      name   = "virtualization-type"
+      values = ["hvm"]
+  }
 }
 
 variable "aws_instance_type" {
@@ -489,8 +494,7 @@ resource "aws_lb_listener" "rancher2-tcp-80-nlb-listener" {
 }
 # ec2 instances
 resource "aws_instance" "rancher2-a-master" {
-#  ami = "ami-087855b6c8b59a9e4"
-  ami = var.aws_ami
+  ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
@@ -516,8 +520,7 @@ resource "aws_lb_target_group_attachment" "rancher2-a-master-tcp-443-tga" {
 }
 
 resource "aws_instance" "rancher2-b-master" {
-#  ami = "ami-087855b6c8b59a9e4"
-  ami = var.aws_ami
+  ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
@@ -543,8 +546,7 @@ resource "aws_lb_target_group_attachment" "rancher2-b-master-tcp-443-tga" {
 }
 
 resource "aws_instance" "rancher2-c-master" {
-#  ami = "ami-087855b6c8b59a9e4"
-  ami = var.aws_ami
+  ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
