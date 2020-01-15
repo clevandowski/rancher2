@@ -66,6 +66,7 @@ resource "aws_subnet" "rancher2-a-subnet" {
   availability_zone = "${var.aws_region}a"
   tags = {
     Name = "rancher2-a-subnet"
+    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -78,6 +79,7 @@ resource "aws_subnet" "rancher2-b-subnet" {
   availability_zone = "${var.aws_region}b"
   tags = {
     Name = "rancher2-b-subnet"
+    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -90,6 +92,7 @@ resource "aws_subnet" "rancher2-c-subnet" {
   availability_zone = "${var.aws_region}c"
   tags = {
     Name = "rancher2-c-subnet"
+    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -103,6 +106,13 @@ resource "aws_security_group" "rancher2-sg" {
     to_port = 22
     protocol = "tcp"
   }
+  // Prometheus node-exporter
+  ingress {
+    cidr_blocks = ["10.0.0.0/16"]
+    from_port = 9796
+    to_port = 9796
+    protocol = "tcp"
+  }
   // Terraform removes the default rule
   egress {
     from_port = 0
@@ -112,6 +122,7 @@ resource "aws_security_group" "rancher2-sg" {
   }
   tags = {
     Name = "rancher2-sg"
+    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -192,6 +203,7 @@ resource "aws_security_group" "rancher2-etcd-sg" {
   }
   tags = {
     Name = "rancher2-etcd-sg"
+#    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -302,6 +314,7 @@ resource "aws_security_group" "rancher2-controlplane-sg" {
   }
   tags = {
     Name = "rancher2-controlplane-sg"
+#    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -401,6 +414,7 @@ resource "aws_security_group" "rancher2-worker-sg" {
   }
   tags = {
     Name = "rancher2-worker-sg"
+#    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
@@ -496,12 +510,17 @@ resource "aws_lb_listener" "rancher2-tcp-80-nlb-listener" {
 resource "aws_instance" "rancher2-a-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
+  iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
   subnet_id = aws_subnet.rancher2-a-subnet.id
   associate_public_ip_address = true
+  root_block_device {
+    volume_size = 16
+  }
   tags = {
     Name = "rancher2-a-master"
+    "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
     role_controlplane = true
@@ -522,12 +541,17 @@ resource "aws_lb_target_group_attachment" "rancher2-a-master-tcp-443-tga" {
 resource "aws_instance" "rancher2-b-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
+  iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
   subnet_id = aws_subnet.rancher2-b-subnet.id
   associate_public_ip_address = true
+  root_block_device {
+    volume_size = 16
+  }
   tags = {
     Name = "rancher2-b-master"
+    "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
     role_controlplane = true
@@ -548,12 +572,17 @@ resource "aws_lb_target_group_attachment" "rancher2-b-master-tcp-443-tga" {
 resource "aws_instance" "rancher2-c-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type
+  iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
   subnet_id = aws_subnet.rancher2-c-subnet.id
   associate_public_ip_address = true
+  root_block_device {
+    volume_size = 16
+  }
   tags = {
     Name = "rancher2-c-master"
+    "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
     role_controlplane = true
@@ -569,4 +598,25 @@ resource "aws_lb_target_group_attachment" "rancher2-c-master-tcp-443-tga" {
   target_group_arn = aws_lb_target_group.rancher2-tcp-443-tg.arn
   target_id = aws_instance.rancher2-c-master.id
   port = 443
+}
+
+resource "aws_instance" "rancher2-a-worker" {
+  ami = data.aws_ami.latest-ubuntu.id
+  instance_type = var.aws_instance_type
+  iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
+  key_name = "rancher2-key-pair"
+  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id]
+  subnet_id = aws_subnet.rancher2-a-subnet.id
+  associate_public_ip_address = true
+  root_block_device {
+    volume_size = 32
+  }
+  tags = {
+    Name = "rancher2-a-worker"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+    role_rke = true
+    role_etcd = false
+    role_controlplane = false
+    role_worker = true
+  }
 }

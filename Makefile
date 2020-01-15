@@ -21,12 +21,17 @@ run: test-env build
 
 	docker container run --rm -ti \
 		--name terraform-$$$$ \
-		--user $$USER_NAME \
-		-v $$HOME/.ssh:/home/$$USER_NAME/.ssh:ro \
-		-v $$HOME/.aws:/home/$$USER_NAME/.aws:ro \
-		-v $$PWD/plans:/home/$$USER_NAME/plans \
-		-v $$PWD/bin:/home/$$USER_NAME/bin \
+		-v $$HOME/.ssh:$$HOME/.ssh:ro \
+		-v $$HOME/.aws:$$HOME/.aws:ro \
+		-v $$PWD/plans:$$HOME/plans \
+		-v $$PWD/bin:$$HOME/bin \
 		$$DOCKER_REPO/terraform:1.0
+
+# 		--user $$USER_NAME \
+# 		-v $$HOME/.ssh:/home/$$USER_NAME/.ssh:ro \
+# 		-v $$HOME/.aws:/home/$$USER_NAME/.aws:ro \
+# 		-v $$PWD/plans:/home/$$USER_NAME/plans \
+# 		-v $$PWD/bin:/home/$$USER_NAME/bin \
 
 clean:
 	docker image rm $$DOCKER_REPO/terraform:1.0

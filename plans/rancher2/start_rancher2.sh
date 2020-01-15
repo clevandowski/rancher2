@@ -12,8 +12,8 @@ terraform show
 
 # Préparation Rancher2
 inventory-template.sh
-ansible-playbook playbook.yml
-ansible-playbook playbook-rancher2.yml
+ansible-playbook -v playbook.yml
+ansible-playbook -v playbook-rancher2.yml
 
 # https://rancher.com/docs/rancher/v2.x/en/installation/ha/
 
@@ -55,7 +55,11 @@ helm install rancher-stable/rancher \
   --name rancher \
   --namespace cattle-system \
   --set hostname=$(jq -r '.resources[] | select(.type == "aws_lb") | .instances[].attributes.dns_name' terraform.tfstate)
+kubectl -n cattle-system rollout status deploy/rancher
 
 # Génération password admin dans rancher_admin_password.txt
 kubectl --kubeconfig $KUBECONFIG -n cattle-system exec $(kubectl --kubeconfig $KUBECONFIG -n cattle-system get pods -l app=rancher | grep '1/1' | head -1 | awk '{ print $1 }') -- reset-password | tail -n 1 > rancher_admin_password.txt
 cat rancher_admin_password.txt
+
+# Ajout storage-class pour activer l'EBS
+kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1a.yml

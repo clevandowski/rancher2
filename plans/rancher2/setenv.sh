@@ -1,0 +1,1 @@
+export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml

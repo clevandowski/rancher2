@@ -20,7 +20,7 @@ cat rancher_admin_password.txt
 ```
 
 ## Conf Rancher2 CLI
-&
+
 ### Création API Key
 
 Rancher UI obligatoire ?
