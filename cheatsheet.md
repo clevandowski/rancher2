@@ -4,19 +4,13 @@
 cd ~/plans/rancher2
 start_rancher2.sh
 ```
+Récupérer l'URL de l'IHM ainsi que le mdp du compte admin
 
 ## Conf kubectl
 
 ```
 export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
 kubectl get nodes
-```
-
-## Définition mdp rancher admin
-
-```
-kubectl --kubeconfig $KUBECONFIG -n cattle-system exec $(kubectl --kubeconfig $KUBECONFIG -n cattle-system get pods -l app=rancher | grep '1/1' | head -1 | awk '{ print $1 }') -- reset-password | tail -n 1 > rancher_admin_password.txt
-cat rancher_admin_password.txt
 ```
 
 ## Conf Rancher2 CLI
@@ -34,6 +28,16 @@ export RANCHER_ACCESS_KEY=token-*****
 export RANCHER_SECRET_KEY=******************************************************
 export RANCHER_BEARER_TOKEN=token-*****:******************************************************
 ```
+
+### Trucs à faire pour le moment via l'IHM Rancher au démarrage
+
+* Pour débloquer la listbox de la version de kubernetes lors de la création d'un cluster (sinon champ vide puis bug à la création): 
+  * Context: Cluster Global (à droite de l'icone de rancher en haut à gauche)
+  * Tools > Drivers > Refresh Kubernetes Metadata
+
+* Définir un storage class par défaut:
+  * Context: Cluster local (à droite de l'icone de rancher en haut à gauche)
+  * Storage > Storage Classes > Set as Default (sur le lien paramètre d'un des storage class)
 
 ## Login
 

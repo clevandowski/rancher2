@@ -4,7 +4,7 @@ ENV HELM_VERSION v2.16.1
 # ENV RKE_VERSION v1.0.0
 
 RUN apt-get update \
-    && apt-get install -y curl unzip python-pip openssh-client bash-completion jq iproute2 net-tools groff xxd iputils-ping dnsutils \
+    && apt-get install -y curl unzip python-pip openssh-client bash-completion jq iproute2 net-tools groff xxd iputils-ping dnsutils vim \
     && apt-get clean all \
     && apt-get autoclean all \
 # TERRAFORM
