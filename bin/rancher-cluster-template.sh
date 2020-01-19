@@ -6,6 +6,7 @@ extract_tfstate_aws_controlplane_instances_to_rancher_cluster_nodes() {
   jq '.resources[] | select(.type == "aws_instance" and .instances[].attributes.tags.role_controlplane == "true")
   | .instances[].attributes
   | {
+      hostname_override: .tags.Name,
       address: .public_ip,
       internal_address: .private_ip,
       user: "ubuntu",
