@@ -27,6 +27,13 @@ extract_tfstate_aws_worker_instances_to_rancher_cluster_nodes() {
       user: "ubuntu",
       role: [
         "worker"
+      ],
+      taints: [
+        {
+          key: "node.elasticsearch.io/unschedulable",
+          value: "",
+          effect: "NoSchedule"
+        }
       ]
     }' terraform.tfstate
 }

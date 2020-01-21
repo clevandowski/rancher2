@@ -113,20 +113,6 @@ resource "aws_security_group" "rancher2-sg" {
     to_port = 9796
     protocol = "tcp"
   }
-  // EFK port 9200 - TODO make a specific security group
-  ingress {
-    cidr_blocks = ["10.0.0.0/16"]
-    from_port = 9200
-    to_port = 9200
-    protocol = "tcp"
-  }
-  // EFK port 9300 - TODO make a specific security group
-  ingress {
-    cidr_blocks = ["10.0.0.0/16"]
-    from_port = 9300
-    to_port = 9300
-    protocol = "tcp"
-  }
   // Terraform removes the default rule
   egress {
     from_port = 0
@@ -432,6 +418,25 @@ resource "aws_security_group" "rancher2-worker-sg" {
   }
 }
 
+resource "aws_security_group" "rancher2-elasticsearch-sg" {
+  name = "rancher2-elasticsearch-sg"
+  vpc_id = aws_vpc.rancher2-vpc.id
+  // ElasticSearch port 9200
+  ingress {
+    cidr_blocks = ["10.0.0.0/16"]
+    from_port = 9200
+    to_port = 9200
+    protocol = "tcp"
+  }
+  // ElasticSearch port 9300
+  ingress {
+    cidr_blocks = ["10.0.0.0/16"]
+    from_port = 9300
+    to_port = 9300
+    protocol = "tcp"
+  }
+}
+
 resource "aws_internet_gateway" "rancher2-gw" {
   vpc_id = aws_vpc.rancher2-vpc.id
   tags = {
@@ -619,7 +624,7 @@ resource "aws_instance" "rancher2-a-worker" {
   instance_type = var.aws_instance_type
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id]
+  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
   subnet_id = aws_subnet.rancher2-a-subnet.id
   associate_public_ip_address = true
   root_block_device {
@@ -640,7 +645,7 @@ resource "aws_instance" "rancher2-b-worker" {
   instance_type = var.aws_instance_type
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id]
+  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
   subnet_id = aws_subnet.rancher2-a-subnet.id
   associate_public_ip_address = true
   root_block_device {
@@ -661,7 +666,7 @@ resource "aws_instance" "rancher2-c-worker" {
   instance_type = var.aws_instance_type
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id]
+  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
   subnet_id = aws_subnet.rancher2-a-subnet.id
   associate_public_ip_address = true
   root_block_device {

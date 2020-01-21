@@ -38,7 +38,7 @@ INFO[0003] Saving config to /home/cyrille/.rancher/cli2.json
 
 Test
 ```
-$ rancher clusters ls    
+$ rancher clusters ls
 CURRENT   ID        STATE     NAME      PROVIDER   NODES     CPU       RAM             PODS
 *         local     active    local     Imported   6         1.73/24   0.17/90.68 GB   31/660
 ```
