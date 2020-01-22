@@ -34,7 +34,10 @@ extract_tfstate_aws_worker_instances_to_rancher_cluster_nodes() {
           value: "",
           effect: "NoSchedule"
         }
-      ]
+      ],
+      labels: {
+        elasticsearch: "reserved"
+      }
     }' terraform.tfstate
 }
 

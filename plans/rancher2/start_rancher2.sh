@@ -65,9 +65,7 @@ start_k8s_cluster() {
   cat rancher_admin_password.txt
 
   # Ajout storage-class pour activer l'EBS
-  kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1a.yml
-  kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1b.yml
-  kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1c.yml
+  kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1.yml
 }
 
 start_cloud_cluster && start_k8s_cluster

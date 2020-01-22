@@ -323,12 +323,6 @@ resource "aws_security_group" "rancher2-worker-sg" {
   name = "rancher2-worker-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = ["0.0.0.0/0"]
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
-  }
-  ingress {
     cidr_blocks = ["10.0.0.0/16"]
     from_port = 80
     to_port = 80
@@ -646,7 +640,7 @@ resource "aws_instance" "rancher2-b-worker" {
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
-  subnet_id = aws_subnet.rancher2-a-subnet.id
+  subnet_id = aws_subnet.rancher2-b-subnet.id
   associate_public_ip_address = true
   root_block_device {
     volume_size = 32
@@ -667,7 +661,7 @@ resource "aws_instance" "rancher2-c-worker" {
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
-  subnet_id = aws_subnet.rancher2-a-subnet.id
+  subnet_id = aws_subnet.rancher2-c-subnet.id
   associate_public_ip_address = true
   root_block_device {
     volume_size = 32
