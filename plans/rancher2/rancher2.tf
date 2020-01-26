@@ -27,9 +27,29 @@ data "aws_ami" "latest-ubuntu" {
   }
 }
 
-variable "aws_instance_type" {
+variable "aws_instance_type_master" {
   type = string
   default = "m5.xlarge"
+}
+
+variable "aws_instance_type_worker" {
+  type = string
+  default = "m5.xlarge"
+}
+
+variable "authorized_ip" {
+  type = string
+  default = "0.0.0.0/0"
+}
+
+variable "egress_ip" {
+  type = string
+  default = "0.0.0.0/0"
+}
+
+variable "aws_vpc_cidr_block" {
+  type = string
+  default = "10.0.0.0/16"
 }
 
 # Configure the AWS Provider
@@ -49,7 +69,7 @@ resource "aws_key_pair" "rancher2-key-pair" {
 
 # Create a VPC
 resource "aws_vpc" "rancher2-vpc" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block = var.aws_vpc_cidr_block
   enable_dns_support = true
   enable_dns_hostnames = true
   tags = {
@@ -101,14 +121,14 @@ resource "aws_security_group" "rancher2-sg" {
   name = "rancher2-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.authorized_ip]
     from_port = 22
     to_port = 22
     protocol = "tcp"
   }
   // Prometheus node-exporter
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9796
     to_port = 9796
     protocol = "tcp"
@@ -118,7 +138,7 @@ resource "aws_security_group" "rancher2-sg" {
     from_port = 0
     to_port = 0
     protocol = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.egress_ip]
   }
   tags = {
     Name = "rancher2-sg"
@@ -130,37 +150,37 @@ resource "aws_security_group" "rancher2-etcd-sg" {
   name = "rancher2-etcd-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
@@ -169,37 +189,37 @@ resource "aws_security_group" "rancher2-etcd-sg" {
     from_port = 443
     to_port = 443
     protocol = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   egress {
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   egress {
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   egress {
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   egress {
     from_port = 8472
     to_port = 8472
     protocol = "udp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   egress {
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
   }
   tags = {
     Name = "rancher2-etcd-sg"
@@ -211,103 +231,103 @@ resource "aws_security_group" "rancher2-controlplane-sg" {
   name = "rancher2-controlplane-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
     from_port = 80
     to_port = 80
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "udp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
@@ -323,85 +343,85 @@ resource "aws_security_group" "rancher2-worker-sg" {
   name = "rancher2-worker-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 80
     to_port = 80
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "udp"
   }
   egress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   egress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
@@ -417,14 +437,14 @@ resource "aws_security_group" "rancher2-elasticsearch-sg" {
   vpc_id = aws_vpc.rancher2-vpc.id
   // ElasticSearch port 9200
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9200
     to_port = 9200
     protocol = "tcp"
   }
   // ElasticSearch port 9300
   ingress {
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 9300
     to_port = 9300
     protocol = "tcp"
@@ -441,7 +461,7 @@ resource "aws_internet_gateway" "rancher2-gw" {
 resource "aws_route_table" "rancher2-rt" {
   vpc_id = aws_vpc.rancher2-vpc.id
   route {
-    cidr_block = "0.0.0.0/0"
+    cidr_block = var.egress_ip
     gateway_id = aws_internet_gateway.rancher2-gw.id
   }
   tags = {
@@ -522,7 +542,7 @@ resource "aws_lb_listener" "rancher2-tcp-80-nlb-listener" {
 # ec2 instances
 resource "aws_instance" "rancher2-a-master" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
@@ -553,7 +573,7 @@ resource "aws_lb_target_group_attachment" "rancher2-a-master-tcp-443-tga" {
 
 resource "aws_instance" "rancher2-b-master" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
@@ -584,7 +604,7 @@ resource "aws_lb_target_group_attachment" "rancher2-b-master-tcp-443-tga" {
 
 resource "aws_instance" "rancher2-c-master" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
@@ -615,7 +635,7 @@ resource "aws_lb_target_group_attachment" "rancher2-c-master-tcp-443-tga" {
 
 resource "aws_instance" "rancher2-a-worker" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
@@ -636,7 +656,7 @@ resource "aws_instance" "rancher2-a-worker" {
 
 resource "aws_instance" "rancher2-b-worker" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
@@ -657,7 +677,7 @@ resource "aws_instance" "rancher2-b-worker" {
 
 resource "aws_instance" "rancher2-c-worker" {
   ami = data.aws_ami.latest-ubuntu.id
-  instance_type = var.aws_instance_type
+  instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
   key_name = "rancher2-key-pair"
   security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]

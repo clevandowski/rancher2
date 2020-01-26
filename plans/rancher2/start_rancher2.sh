@@ -3,12 +3,13 @@
 set -e
 
 cd ~/plans/rancher2
+PUBLIC_IP=$(dig -4 +short myip.opendns.com @resolver1.opendns.com)
 
 start_cloud_cluster() {
   # Provision cluster VM sur cloud
   terraform init
   terraform validate
-  terraform plan -out rancher2.plan
+  terraform plan -var authorized_ip="$PUBLIC_IP/32" -out rancher2.plan
   terraform apply -auto-approve rancher2.plan
   terraform show
   # Préparation Rancher2
@@ -37,16 +38,22 @@ start_k8s_cluster() {
 
   # Install cert-manager
   # https://rancher.com/docs/rancher/v2.x/en/installation/ha/helm-rancher/#optional-install-cert-manager
-  kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.9/deploy/manifests/00-crds.yaml
+  kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml
   kubectl create namespace cert-manager
-  kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
+  # kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
   helm repo add jetstack https://charts.jetstack.io
   helm repo update
+  # helm install \
+  #     --name cert-manager \
+  #     --namespace cert-manager \
+  #     --version v0.9.1 \
+  #     jetstack/cert-manager
   helm install \
-      --name cert-manager \
-      --namespace cert-manager \
-      --version v0.9.1 \
-      jetstack/cert-manager
+    --name cert-manager \
+    --namespace cert-manager \
+    --version v0.12.0 \
+    jetstack/cert-manager
+
   kubectl -n cert-manager rollout status deploy/cert-manager
   kubectl -n cert-manager rollout status deploy/cert-manager-cainjector
   kubectl -n cert-manager rollout status deploy/cert-manager-webhook
