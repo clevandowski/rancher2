@@ -13,7 +13,7 @@ export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
 kubectl get nodes
 ```
 
-## Conf Rancher2 CLI
+## Conf Rancher2 CLI (pas super nécessaire)
 
 ### Création API Key
 
@@ -70,6 +70,7 @@ Name: basic-node-template
 
 * Création cluster
 
+Name: sandbox
 Amazon EC2
 !!! ATTENTION !!! Si le champ "Kubernetes version" est vide, faire "Tools -> Drivers -> Refresh Kubernetes Metadata" dans l'ihm rancher 2
 
@@ -80,92 +81,6 @@ Récupérer le kubeconfig dans un fichier (ex: sandbox.yml)
 export KUBECONFIG=$KUBECONFIG:$(pwd)/sandbox.yml
 kubectl config use-context sandbox-master1
 kubectl get nodes
-```
-
-# Provisionning détaillé
-
-## Provision des 3 masters
-
-```
-cd ~/plans/rancher2
-terraform init
-terraform validate
-terraform plan -out rancher2.plan
-terraform apply -auto-approve rancher2.plan
-terraform show
-```
-
-Arrêt/Destruction cluster
-```
-terraform destroy -auto-approve
-```
-
-## Préparation Rancher2
-
-cf https://rancher.com/docs/rke/latest/en/os/
-
-```
-inventory-template.sh
-ansible-playbook playbook.yml
-ansible-playbook playbook-rancher2.yml
-```
-
-## Démarrage Kubernetes via RKE
-
-```
-rancher-cluster-template.sh
-rke up --config ./rancher-cluster.yml
-export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
-kubectl get nodes
-```
-
-Arrêt/Suppression cluster
-```
-rke remove --config ./rancher-cluster.yml --force
-```
-
-## Installation Helm
-
-```
-kubectl -n kube-system create serviceaccount tiller
-kubectl create clusterrolebinding tiller \
-    --clusterrole=cluster-admin \
-    --serviceaccount=kube-system:tiller
-helm init --service-account tiller
-
-kubectl -n kube-system rollout status deploy/tiller-deploy
-helm version
-```
-
-## Install cert-manager (pour ca interne ou letsencrypt)
-
-```
-kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.9/deploy/manifests/00-crds.yaml
-kubectl create namespace cert-manager
-kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
-helm install \
-    --name cert-manager \
-    --namespace cert-manager \
-    --version v0.9.1 \
-    jetstack/cert-manager
-kubectl get pods --namespace cert-manager -w
-```
-
-## Install Rancher
-
-```
-helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
-helm install rancher-stable/rancher \
-  --name rancher \
-  --namespace cattle-system \
-  --set hostname=$(jq -r '.resources[] | select(.type == "aws_lb") | .instances[].attributes.dns_name' terraform.tfstate)
-```
-
-## Arrêt/Suppression rancher
-```
-helm del --purge rancher
 ```
 
 ## Suppression tout
