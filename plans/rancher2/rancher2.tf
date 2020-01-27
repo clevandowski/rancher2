@@ -236,8 +236,13 @@ resource "aws_security_group" "rancher2-controlplane-sg" {
     to_port = 80
     protocol = "tcp"
   }
+  # Le daemonset cattle-system/cattle-node-agent
+  # et le deployment cattle-system/cattle-cluster-agent
+  # ont besoin que les ips des instances aws du cluster k8s
+  # aient accès au port 443
   ingress {
-    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
+    cidr_blocks = [var.egress_ip]
+    #cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
