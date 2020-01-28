@@ -8,7 +8,7 @@ fi
 
 helm --debug install ./helm-charts/elasticsearch --name elasticsearch \
   --namespace elasticsearch \
-  --set clusterName=es-rancher-master \
+  --set clusterName=es-rancher \
   --set resources.requests.cpu=null \
   --set resources.limits.cpu=null \
   --set resources.requests.memory=12Gi \
@@ -19,7 +19,7 @@ helm --debug install ./helm-charts/elasticsearch --name elasticsearch \
   --set tolerations[0].effect=NoSchedule \
   --set volumeClaimTemplate.accessModes[0]=ReadWriteOnce \
   --set volumeClaimTemplate.resources.requests.storage=30Gi \
-  --set volumeClaimTemplate.storageClassName=aws.pg2.eu-central-1 \
+  --set volumeClaimTemplate.storageClassName=aws.pg2.default \
   --set nodeSelector.elasticsearch=reserved \
   --set service.type=LoadBalancer \
   --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-internal"=\"true\" \
@@ -30,11 +30,11 @@ helm install --name filebeat ./helm-charts/filebeat \
   --set tolerations[0].operator=Exists \
   --set tolerations[0].effect=NoSchedule \
   --set extraEnvs[0].name=ELASTICSEARCH_HOSTS \
-  --set extraEnvs[0].value=es-rancher-master-master.elasticsearch.svc.cluster.local
+  --set extraEnvs[0].value=es-rancher-master.elasticsearch.svc.cluster.local
   # --set imageTag=7.5.2 \
 
 helm install --name kibana ./helm-charts/kibana \
-  --set elasticsearchHosts=http://es-rancher-master-master.elasticsearch.svc.cluster.local:9200
+  --set elasticsearchHosts=http://es-rancher-master.elasticsearch.svc.cluster.local:9200
   # --set imageTag=7.5.2 \
 
 echo "Start following command to access kibana at http://localhost:5601"

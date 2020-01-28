@@ -1,17 +1,11 @@
 variable "aws_profile" {
   type = string
-  # la-fonciere-numerique
-  # default = "lafonciere"
-  # ops-zenika
-  default = "clevandowski-ops-zenika"
+  default = "your aws profile here from ~/.aws/credentials"
 }
 
 variable "aws_region" {
   type = string
-  # la-fonciere-numerique
-  # default = "eu-west-3"
-  # ops-zenika
-  default = "eu-central-1"
+  default = "eu-west-3"
 }
 
 data "aws_ami" "latest-ubuntu" {
@@ -453,6 +447,9 @@ resource "aws_security_group" "rancher2-elasticsearch-sg" {
     from_port = 9300
     to_port = 9300
     protocol = "tcp"
+  }
+  tags = {
+    Name = "rancher2-worker-sg"
   }
 }
 

@@ -2,14 +2,41 @@
 
 set -e
 
+if [ -z "$AWS_PROFILE" ] || [ -z "$AWS_REGION" ]; then
+  echo "Required environment variables:"
+  echo "* AWS_PROFILE"
+  echo "* AWS_REGION"
+  echo "Aborting"
+  exit 1
+fi
+
 cd ~/plans/rancher2
-PUBLIC_IP=$(dig -4 +short myip.opendns.com @resolver1.opendns.com)
+export PUBLIC_IP=$(dig -4 +short myip.opendns.com @resolver1.opendns.com)
+export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
+
+create_default_storageclass_on_current_aws_region() {
+  kubectl --kubeconfig $KUBECONFIG apply -f - <<COINCOIN
+    kind: StorageClass
+    apiVersion: storage.k8s.io/v1
+    metadata:
+      name: aws.pg2.default
+    provisioner: kubernetes.io/aws-ebs
+    parameters:
+      type: gp2
+      zones: "${AWS_REGION}a, ${AWS_REGION}b, ${AWS_REGION}c"
+    reclaimPolicy: Retain
+    allowVolumeExpansion: true
+    mountOptions:
+      - debug
+    volumeBindingMode: Immediate
+COINCOIN
+}
 
 start_cloud_cluster() {
   # Provision cluster VM sur cloud
   terraform init
   terraform validate
-  terraform plan -var authorized_ip="$PUBLIC_IP/32" -out rancher2.plan
+  terraform plan -var aws_profile="$AWS_PROFILE" -var aws_region="$AWS_REGION" -var authorized_ip="$PUBLIC_IP/32" -out rancher2.plan
   terraform apply -auto-approve rancher2.plan
   terraform show
   # Préparation Rancher2
@@ -24,7 +51,6 @@ start_cloud_cluster() {
 start_k8s_cluster() {
   rancher-cluster-template.sh
   rke up --config ./rancher-cluster.yml
-  export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
   kubectl get nodes
 
   # Installation Helm
@@ -65,14 +91,15 @@ start_k8s_cluster() {
     --name rancher \
     --namespace cattle-system \
     --set hostname=$(jq -r '.resources[] | select(.type == "aws_lb") | .instances[].attributes.dns_name' terraform.tfstate)
+    # --set hostname=cyrille.aws.zenika.com
   kubectl -n cattle-system rollout status deploy/rancher
 
   # Génération password admin dans rancher_admin_password.txt
-  kubectl --kubeconfig $KUBECONFIG -n cattle-system exec $(kubectl --kubeconfig $KUBECONFIG -n cattle-system get pods -l app=rancher | grep '1/1' | head -1 | awk '{ print $1 }') -- reset-password | tail -n 1 > rancher_admin_password.txt
+  kubectl -n cattle-system exec $(kubectl -n cattle-system get pods -l app=rancher | grep '1/1' | head -1 | awk '{ print $1 }') -- reset-password | tail -n 1 > rancher_admin_password.txt
   cat rancher_admin_password.txt
 
   # Ajout storage-class pour activer l'EBS
-  kubectl --kubeconfig $KUBECONFIG apply -f storage_class_aws_gp2_eu-central-1.yml
+  create_default_storageclass_on_current_aws_region
 }
 
 start_cloud_cluster && start_k8s_cluster
