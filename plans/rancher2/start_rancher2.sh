@@ -2,16 +2,20 @@
 
 set -e
 
-if [ -z "$AWS_PROFILE" ] || [ -z "$AWS_REGION" ]; then
+if [ -z "$AWS_PROFILE" ] || [ -z "$AWS_REGION" ] || [ -z "$RANCHER_LB_DNS" ]; then
   echo "Required environment variables:"
   echo "* AWS_PROFILE"
   echo "* AWS_REGION"
+  echo "* RANCHER_LB_DNS"
   echo "Aborting"
   exit 1
 fi
 
 cd ~/plans/rancher2
 export PUBLIC_IP=$(dig -4 +short myip.opendns.com @resolver1.opendns.com)
+# La hosted zone (ex: example.com pour un DNS rancher.example.com) référencée doit exister dans AWS route 53
+export HOSTED_ZONE_NAME=$(echo "$RANCHER_LB_DNS" | sed -e 's|^[^\.]\+\.\(.*\)$|\1|')
+export RANCHER_LB_DNS_HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq -r ".HostedZones[] | select(.Name==\"${HOSTED_ZONE_NAME}.\") | .Id")
 export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
 
 create_default_storageclass_on_current_aws_region() {
@@ -35,14 +39,23 @@ COINCOIN
 start_cloud_cluster() {
   # Provision cluster VM sur cloud
   terraform init
-  terraform validate
-  terraform plan -var aws_profile="$AWS_PROFILE" -var aws_region="$AWS_REGION" -var authorized_ip="$PUBLIC_IP/32" -out rancher2.plan
-  terraform apply -auto-approve rancher2.plan
-  terraform show
-  # Préparation Rancher2
-  inventory-template.sh
-  ansible-playbook -v playbook.yml
-  ansible-playbook -v playbook-rancher2.yml
+  if terraform validate; then
+    terraform plan \
+      -var aws_profile="$AWS_PROFILE" \
+      -var aws_region="$AWS_REGION" \
+      -var authorized_ip="$PUBLIC_IP/32" \
+      -var rancher_lb_dns="$RANCHER_LB_DNS" \
+      -var rancher_hosted_zone_id="$RANCHER_LB_DNS_HOSTED_ZONE_ID" \
+      -out rancher2.plan
+    terraform apply -auto-approve rancher2.plan
+    terraform show
+    # Préparation Rancher2
+    inventory-template.sh
+    ansible-playbook -v playbook.yml
+    ansible-playbook -v playbook-rancher2.yml
+  else
+    return 1
+  fi
 }
 
 # https://rancher.com/docs/rancher/v2.x/en/installation/ha/
@@ -90,8 +103,8 @@ start_k8s_cluster() {
   helm install rancher-stable/rancher \
     --name rancher \
     --namespace cattle-system \
-    --set hostname=$(jq -r '.resources[] | select(.type == "aws_lb") | .instances[].attributes.dns_name' terraform.tfstate)
-    # --set hostname=cyrille.aws.zenika.com
+    --set hostname=$RANCHER_LB_DNS
+    # --set hostname=$(jq -r '.resources[] | select(.type == "aws_lb") | .instances[].attributes.dns_name' terraform.tfstate)
   kubectl -n cattle-system rollout status deploy/rancher
 
   # Génération password admin dans rancher_admin_password.txt

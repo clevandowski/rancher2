@@ -46,6 +46,16 @@ variable "aws_vpc_cidr_block" {
   default = "10.0.0.0/16"
 }
 
+variable "rancher_lb_dns" {
+  type = string
+  default = "rancher.mydomain.com"
+}
+
+variable "rancher_hosted_zone_id" {
+  type = string
+  default = "A injecter en fonction d'une hosted zone existante"
+}
+
 # Configure the AWS Provider
 provider "aws" {
   shared_credentials_file = "/home/cyrille/.aws/credentials"
@@ -539,6 +549,16 @@ resource "aws_lb_listener" "rancher2-tcp-80-nlb-listener" {
   default_action {
     type = "forward"
     target_group_arn = aws_lb_target_group.rancher2-tcp-80-tg.arn
+  }
+}
+resource "aws_route53_record" "rancher_lb_dns" {
+  zone_id = var.rancher_hosted_zone_id
+  name = var.rancher_lb_dns
+  type = "A"
+  alias {
+    name = aws_lb.rancher2-nlb.dns_name
+    zone_id = aws_lb.rancher2-nlb.zone_id
+    evaluate_target_health = true
   }
 }
 # ec2 instances
