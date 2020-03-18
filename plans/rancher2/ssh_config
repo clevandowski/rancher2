@@ -1,0 +1,83 @@
+Host rancher2-bastion
+  Hostname 13.48.130.131
+  User ec2-user
+  IdentityFile /home/cyrille/.ssh/id_rsa
+  StrictHostKeyChecking no
+
+Host rancher2-c-worker
+  Hostname 10.0.3.205
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+Host rancher2-b-master
+  Hostname 10.0.2.174
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+Host rancher2-c-master
+  Hostname 10.0.3.73
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+Host rancher2-a-master
+  Hostname 10.0.1.32
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+Host rancher2-b-worker
+  Hostname 10.0.2.54
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+Host rancher2-a-worker
+  Hostname 10.0.1.179
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-c-public-subnet
+Host 10.0.6.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-c-private-subnet
+Host 10.0.3.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-a-private-subnet
+Host 10.0.1.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-bastion-subnet
+Host 10.0.0.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-a-public-subnet
+Host 10.0.4.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-b-private-subnet
+Host 10.0.2.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no
+
+# Allow to connect to any host in subnet rancher2-b-public-subnet
+Host 10.0.5.*
+  User ubuntu
+  ProxyCommand ssh -W %h:%p -F ssh_config rancher2-bastion
+  StrictHostKeyChecking no

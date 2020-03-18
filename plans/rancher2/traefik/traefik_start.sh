@@ -21,6 +21,6 @@ else
     --set acme.dnsProvider.route53.AWS_REGION=${AWS_REGION}
 fi
 
-if kubectl get service kibana-kibana 2>/dev/null; then
+if ! kubectl get service kibana-kibana 2>/dev/null; then
   kubectl apply -f kibana-ingress.yml
 fi

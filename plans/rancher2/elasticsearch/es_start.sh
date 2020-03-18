@@ -3,7 +3,7 @@
 if [ -d "helm-charts" ]; then
   git -C helm-charts pull
 else
-  git clone git@github.com:elastic/helm-charts.git
+  git clone https://github.com/elastic/helm-charts.git
 fi
 
 helm --debug install ./helm-charts/elasticsearch --name elasticsearch \

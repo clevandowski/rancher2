@@ -1,24 +1,11 @@
 variable "aws_profile" {
   type = string
-  default = "your aws profile here from ~/.aws/credentials"
+  description = "your aws profile here from ~/.aws/credentials"
 }
 
 variable "aws_region" {
   type = string
   default = "eu-west-3"
-}
-
-data "aws_ami" "latest-ubuntu" {
-  owners = ["099720109477"] # Canonical
-  most_recent = true
-  filter {
-      name   = "name"
-      values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
-  }
-  filter {
-      name   = "virtualization-type"
-      values = ["hvm"]
-  }
 }
 
 variable "aws_instance_type_master" {
@@ -48,27 +35,61 @@ variable "aws_vpc_cidr_block" {
 
 variable "rancher_lb_dns" {
   type = string
-  default = "rancher.mydomain.com"
+  description = "Enregistrement DNS associée à Rancher sur Route53 rancher.mydomain.com"
+  default = ""
 }
 
 variable "rancher_hosted_zone_id" {
   type = string
-  default = "A injecter en fonction d'une hosted zone existante"
+  description = "A injecter en fonction d'une hosted zone existante"
+  default = ""
 }
+
+variable "rancher_id_rsa_pub_path" {
+  type = string
+  description = "Chemin vers la clé publique utilisé pour se connecter au VMs"
+  default = "~/.ssh/id_rsa.pub"
+}
+
 
 # Configure the AWS Provider
 provider "aws" {
-  shared_credentials_file = "/home/cyrille/.aws/credentials"
   profile = var.aws_profile
   version = "~> 2.0"
   region = var.aws_region
 }
 
-# https://medium.com/@hmalgewatta/setting-up-an-aws-ec2-instance-with-ssh-access-using-terraform-c336c812322f
+# Data
+data "aws_ami" "latest-ubuntu" {
+  owners = ["099720109477"] # Canonical
+  most_recent = true
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
 
+data "aws_ami" "nat-instance" {
+  owners = ["amazon"] # amazon
+  most_recent = true
+  filter {
+    name   = "name"
+    values = ["amzn-ami-vpc-nat-2018.03.0.20190611-x86_64-ebs"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# https://medium.com/@hmalgewatta/setting-up-an-aws-ec2-instance-with-ssh-access-using-terraform-c336c812322f
 resource "aws_key_pair" "rancher2-key-pair" {
   key_name   = "rancher2-key-pair"
-  public_key = file("~/.ssh/id_rsa.pub")
+  public_key = file(var.rancher_id_rsa_pub_path)
 }
 
 # Create a VPC
@@ -81,58 +102,315 @@ resource "aws_vpc" "rancher2-vpc" {
   }
 }
 
-# Create a Subnet in zone "a"
-resource "aws_subnet" "rancher2-a-subnet" {
-  # Input: "10.0.0.0/16" => Output: "10.0.0.0/20"
-  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 4, 0)
+# Internet Gateway
+resource "aws_internet_gateway" "rancher2-igw" {
   vpc_id = aws_vpc.rancher2-vpc.id
-#  availability_zone = "eu-west-3a"
+  tags = {
+    Name = "rancher2-igw"
+  }
+}
+
+# Internet Gateway route, external public access
+resource "aws_route_table" "rancher2-public-to-igw-rt" {
+  vpc_id = aws_vpc.rancher2-vpc.id
+  route {
+    cidr_block = var.egress_ip
+    gateway_id = aws_internet_gateway.rancher2-igw.id
+  }
+  tags = {
+    Name = "rancher2-public-to-igw-rt"
+    Zone = "Public"
+  }
+}
+
+/******************
+* Bastion
+*******************/
+resource "aws_subnet" "rancher2-bastion-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.0.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 0)
+  vpc_id = aws_vpc.rancher2-vpc.id
   availability_zone = "${var.aws_region}a"
   tags = {
-    Name = "rancher2-a-subnet"
+    Name = "rancher2-bastion-subnet"
+    Zone = "Public"
     "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
 
-# Create a Subnet in zone "b"
-resource "aws_subnet" "rancher2-b-subnet" {
-  # Input: "10.0.0.0/16" => Output: "10.0.16.0/20"
-  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 4, 1)
-  vpc_id = aws_vpc.rancher2-vpc.id
-#  availability_zone = "eu-west-3b"
-  availability_zone = "${var.aws_region}b"
-  tags = {
-    Name = "rancher2-b-subnet"
-    "kubernetes.io/cluster/rancher-master" = "owned"
-  }
+resource "aws_route_table_association" "rancher2-bastion-to-igw-rta" {
+  subnet_id = aws_subnet.rancher2-bastion-subnet.id
+  route_table_id = aws_route_table.rancher2-public-to-igw-rt.id
 }
 
-# Create a Subnet in zone "c"
-resource "aws_subnet" "rancher2-c-subnet" {
-  # Input: "10.0.0.0/16" => Output: "10.0.32.0/20"
-  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 4, 2)
-  vpc_id = aws_vpc.rancher2-vpc.id
-#  availability_zone = "eu-west-3c"
-  availability_zone = "${var.aws_region}c"
-  tags = {
-    Name = "rancher2-c-subnet"
-    "kubernetes.io/cluster/rancher-master" = "owned"
-  }
-}
+resource "aws_security_group" "rancher2-bastion-sg" {
+  name = "rancher2-bastion-sg"
+  description = "Allow ssh access to connect to private subnet from authorized ips"
 
-# Create a Security Group
-resource "aws_security_group" "rancher2-sg" {
-  name = "rancher2-sg"
-  vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
     cidr_blocks = [var.authorized_ip]
     from_port = 22
     to_port = 22
     protocol = "tcp"
   }
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = [var.egress_ip]
+  }
+
+  egress {
+    from_port = 80
+    to_port = 80
+    protocol = "tcp"
+    cidr_blocks = [var.egress_ip]
+  }
+  egress {
+    from_port = 443
+    to_port = 443
+    protocol = "tcp"
+    cidr_blocks = [var.egress_ip]
+  }
+  egress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
+  }
+  egress {
+    from_port = 6443
+    to_port = 6443
+    protocol = "tcp"
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
+  }
+  egress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = [var.egress_ip]
+  }
+
+  vpc_id = aws_vpc.rancher2-vpc.id
+
+  tags = {
+    Name = "rancher2-bastion-sg"
+    Zone = "Public"
+  }
+}
+
+resource "aws_instance" "rancher2-bastion" {
+  # this is a special ami preconfigured to do NAT
+  # TODO  Cyrille mettre une centos basique à la place (adhérence scripts provisionning)
+  ami = data.aws_ami.nat-instance.id
+  instance_type = "t3.micro"
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-bastion-sg.id]
+  subnet_id = aws_subnet.rancher2-bastion-subnet.id
+  associate_public_ip_address = true
+  source_dest_check = false
+
+  tags = {
+    Name = "rancher2-bastion"
+    Zone = "Public"
+  }
+}
+
+#################################
+# NAT Gateways (1 per zone)     #
+#################################
+# Each NAT gateway requires:
+# * a public subnet (routed to igw)
+# * an elastic ip
+# Zone a
+resource "aws_subnet" "rancher2-a-public-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.4.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 4)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}a"
+  tags = {
+    Name = "rancher2-a-public-subnet"
+    Zone = "Public"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-a-public-subnet-to-igw-rta" {
+  subnet_id = aws_subnet.rancher2-a-public-subnet.id
+  route_table_id = aws_route_table.rancher2-public-to-igw-rt.id
+}
+resource "aws_eip" "rancher2-a-ngw-eip" {
+  vpc = true
+  tags = {
+    Name = "rancher2-a-ngw-eip"
+  }
+}
+resource "aws_nat_gateway" "rancher2-a-ngw" {
+  allocation_id = aws_eip.rancher2-a-ngw-eip.id
+  subnet_id = aws_subnet.rancher2-a-public-subnet.id
+  tags = {
+    Name = "rancher2-a-ngw"
+  }
+}
+resource "aws_route_table" "rancher2-private-a-to-ngw-rt" {
+  vpc_id = aws_vpc.rancher2-vpc.id
+  route {
+    cidr_block = var.egress_ip
+    nat_gateway_id = aws_nat_gateway.rancher2-a-ngw.id
+  }
+  tags = {
+    Name = "rancher2-private-a-to-ngw-rt"
+    Zone = "Public"
+  }
+}
+# Zone b
+resource "aws_subnet" "rancher2-b-public-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.5.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 5)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}b"
+  tags = {
+    Name = "rancher2-b-public-subnet"
+    Zone = "Public"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-b-public-subnet-to-igw-rta" {
+  subnet_id = aws_subnet.rancher2-b-public-subnet.id
+  route_table_id = aws_route_table.rancher2-public-to-igw-rt.id
+}
+resource "aws_eip" "rancher2-b-ngw-eip" {
+  vpc = true
+  tags = {
+    Name = "rancher2-b-ngw-eip"
+  }
+}
+resource "aws_nat_gateway" "rancher2-b-ngw" {
+  allocation_id = aws_eip.rancher2-b-ngw-eip.id
+  subnet_id = aws_subnet.rancher2-b-public-subnet.id
+  tags = {
+    Name = "rancher2-b-ngw"
+  }
+}
+resource "aws_route_table" "rancher2-private-b-to-ngw-rt" {
+  vpc_id = aws_vpc.rancher2-vpc.id
+  route {
+    cidr_block = var.egress_ip
+    nat_gateway_id = aws_nat_gateway.rancher2-b-ngw.id
+  }
+  tags = {
+    Name = "rancher2-private-b-to-ngw-rt"
+    Zone = "Public"
+  }
+}
+# Zone c
+resource "aws_subnet" "rancher2-c-public-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.6.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 6)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}c"
+  tags = {
+    Name = "rancher2-c-public-subnet"
+    Zone = "Public"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-c-public-subnet-to-igw-rta" {
+  subnet_id = aws_subnet.rancher2-c-public-subnet.id
+  route_table_id = aws_route_table.rancher2-public-to-igw-rt.id
+}
+resource "aws_eip" "rancher2-c-ngw-eip" {
+  vpc = true
+  tags = {
+    Name = "rancher2-c-ngw-eip"
+  }
+}
+resource "aws_nat_gateway" "rancher2-c-ngw" {
+  allocation_id = aws_eip.rancher2-c-ngw-eip.id
+  subnet_id = aws_subnet.rancher2-c-public-subnet.id
+  tags = {
+    Name = "rancher2-c-ngw"
+  }
+}
+resource "aws_route_table" "rancher2-private-c-to-ngw-rt" {
+  vpc_id = aws_vpc.rancher2-vpc.id
+  route {
+    cidr_block = var.egress_ip
+    nat_gateway_id = aws_nat_gateway.rancher2-c-ngw.id
+  }
+  tags = {
+    Name = "rancher2-private-c-to-ngw-rt"
+    Zone = "Public"
+  }
+}
+
+##########################################
+# Private Zone rancher2-x-private-subnet #
+##########################################
+# Zone a
+resource "aws_subnet" "rancher2-a-private-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.1.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 1)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}a"
+  tags = {
+    Name = "rancher2-a-private-subnet"
+    Zone = "Private"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-private-a-subnet-to-ngw-rta" {
+  route_table_id = aws_route_table.rancher2-private-a-to-ngw-rt.id
+  subnet_id = aws_subnet.rancher2-a-private-subnet.id
+}
+
+# Zone b
+resource "aws_subnet" "rancher2-b-private-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.2.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 2)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}b"
+  tags = {
+    Name = "rancher2-b-private-subnet"
+    Zone = "Private"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-private-b-subnet-to-ngw-rta" {
+  route_table_id = aws_route_table.rancher2-private-b-to-ngw-rt.id
+  subnet_id = aws_subnet.rancher2-b-private-subnet.id
+}
+
+# Zone c
+resource "aws_subnet" "rancher2-c-private-subnet" {
+  # Input: "10.0.0.0/16" => Output: "10.0.3.0/24"
+  cidr_block = cidrsubnet(aws_vpc.rancher2-vpc.cidr_block, 8, 3)
+  vpc_id = aws_vpc.rancher2-vpc.id
+  availability_zone = "${var.aws_region}c"
+  tags = {
+    Name = "rancher2-c-private-subnet"
+    Zone = "Private"
+    "kubernetes.io/cluster/rancher-master" = "owned"
+  }
+}
+resource "aws_route_table_association" "rancher2-private-c-subnet-to-ngw-rta" {
+  route_table_id = aws_route_table.rancher2-private-c-to-ngw-rt.id
+  subnet_id = aws_subnet.rancher2-c-private-subnet.id
+}
+
+
+# Create a Security Group
+resource "aws_security_group" "rancher2-sg" {
+  name = "rancher2-sg"
+  vpc_id = aws_vpc.rancher2-vpc.id
+  ingress {
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+  }
   // Prometheus node-exporter
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9796
     to_port = 9796
     protocol = "tcp"
@@ -146,45 +424,47 @@ resource "aws_security_group" "rancher2-sg" {
   }
   tags = {
     Name = "rancher2-sg"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
+
 
 resource "aws_security_group" "rancher2-etcd-sg" {
   name = "rancher2-etcd-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
@@ -193,40 +473,41 @@ resource "aws_security_group" "rancher2-etcd-sg" {
     from_port = 443
     to_port = 443
     protocol = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   egress {
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   egress {
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   egress {
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   egress {
     from_port = 8472
     to_port = 8472
     protocol = "udp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   egress {
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
   }
   tags = {
     Name = "rancher2-etcd-sg"
+    Zone = "Private"
 #    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
@@ -235,7 +516,7 @@ resource "aws_security_group" "rancher2-controlplane-sg" {
   name = "rancher2-controlplane-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
+    cidr_blocks = [var.aws_vpc_cidr_block]
     from_port = 80
     to_port = 80
     protocol = "tcp"
@@ -245,104 +526,106 @@ resource "aws_security_group" "rancher2-controlplane-sg" {
   # ont besoin que les ips des instances aws du cluster k8s
   # aient accès au port 443
   ingress {
-    cidr_blocks = [var.egress_ip]
+    // Incoming traffic from NLB does not mask incoming request (so ip from internet)
+    cidr_blocks = [var.egress_ip, aws_vpc.rancher2-vpc.cidr_block]
     #cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.authorized_ip,var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "udp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2379
     to_port = 2379
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2380
     to_port = 2380
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   tags = {
     Name = "rancher2-controlplane-sg"
+    Zone = "Private"
 #    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
@@ -352,91 +635,93 @@ resource "aws_security_group" "rancher2-worker-sg" {
   name = "rancher2-worker-sg"
   vpc_id = aws_vpc.rancher2-vpc.id
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 80
     to_port = 80
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    // Incoming traffic from NLB does not mask incoming request (so ip from internet)
+    cidr_blocks = [var.egress_ip, aws_vpc.rancher2-vpc.cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 2376
     to_port = 2376
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10250
     to_port = 10250
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "tcp"
   }
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 30000
     to_port = 32767
     protocol = "udp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 443
     to_port = 443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 6443
     to_port = 6443
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 8472
     to_port = 8472
     protocol = "udp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9099
     to_port = 9099
     protocol = "tcp"
   }
   egress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 10254
     to_port = 10254
     protocol = "tcp"
   }
   tags = {
     Name = "rancher2-worker-sg"
+    Zone = "Private"
 #    "kubernetes.io/cluster/rancher-master" = "owned"
   }
 }
@@ -446,45 +731,24 @@ resource "aws_security_group" "rancher2-elasticsearch-sg" {
   vpc_id = aws_vpc.rancher2-vpc.id
   // ElasticSearch port 9200
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9200
     to_port = 9200
     protocol = "tcp"
   }
   // ElasticSearch port 9300
   ingress {
-    cidr_blocks = [var.aws_vpc_cidr_block]
+    cidr_blocks = [aws_vpc.rancher2-vpc.cidr_block]
     from_port = 9300
     to_port = 9300
     protocol = "tcp"
   }
   tags = {
-    Name = "rancher2-elasticsearch-sg"
+    Name = "rancher2-worker-sg"
+    Zone = "Private"
   }
 }
 
-resource "aws_internet_gateway" "rancher2-igw" {
-  vpc_id = aws_vpc.rancher2-vpc.id
-  tags = {
-    Name = "rancher2-igw"
-  }
-}
-
-resource "aws_route_table" "rancher2-rt" {
-  vpc_id = aws_vpc.rancher2-vpc.id
-  route {
-    cidr_block = var.egress_ip
-    gateway_id = aws_internet_gateway.rancher2-igw.id
-  }
-  tags = {
-    Name = "rancher2-rt"
-  }
-}
-
-resource "aws_main_route_table_association" "rancher2-mrta" {
-  vpc_id = aws_vpc.rancher2-vpc.id
-  route_table_id = aws_route_table.rancher2-rt.id
-}
 
 resource "aws_lb_target_group" "rancher2-tcp-80-tg" {
   name = "rancher2-tcp-80-tg"
@@ -526,11 +790,13 @@ resource "aws_lb" "rancher2-nlb" {
   name = "rancher2-nlb"
   load_balancer_type = "network"
   internal = false
-  subnets = [aws_subnet.rancher2-a-subnet.id,aws_subnet.rancher2-b-subnet.id,aws_subnet.rancher2-c-subnet.id]
+  # subnets = [aws_subnet.rancher2-bastion-subnet.id]
+  subnets = [aws_subnet.rancher2-a-public-subnet.id,aws_subnet.rancher2-b-public-subnet.id,aws_subnet.rancher2-c-public-subnet.id]
   enable_deletion_protection = false
   enable_cross_zone_load_balancing = true
   tags = {
     Name = "rancher"
+    Zone = "Public"
   }
 }
 resource "aws_lb_listener" "rancher2-tcp-443-nlb-listener" {
@@ -552,6 +818,7 @@ resource "aws_lb_listener" "rancher2-tcp-80-nlb-listener" {
   }
 }
 resource "aws_route53_record" "rancher_lb_dns" {
+  count = var.rancher_hosted_zone_id != "" ? 1 : 0 
   zone_id = var.rancher_hosted_zone_id
   name = var.rancher_lb_dns
   type = "A"
@@ -566,15 +833,15 @@ resource "aws_instance" "rancher2-a-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
-  subnet_id = aws_subnet.rancher2-a-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
+  subnet_id = aws_subnet.rancher2-a-private-subnet.id
   root_block_device {
     volume_size = 16
   }
   tags = {
     Name = "rancher2-a-master"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
@@ -597,15 +864,15 @@ resource "aws_instance" "rancher2-b-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
-  subnet_id = aws_subnet.rancher2-b-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
+  subnet_id = aws_subnet.rancher2-b-private-subnet.id
   root_block_device {
     volume_size = 16
   }
   tags = {
     Name = "rancher2-b-master"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
@@ -628,15 +895,15 @@ resource "aws_instance" "rancher2-c-master" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_master
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
-  subnet_id = aws_subnet.rancher2-c-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-etcd-sg.id,aws_security_group.rancher2-controlplane-sg.id]
+  subnet_id = aws_subnet.rancher2-c-private-subnet.id
   root_block_device {
     volume_size = 16
   }
   tags = {
     Name = "rancher2-c-master"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = true
@@ -659,15 +926,15 @@ resource "aws_instance" "rancher2-a-worker" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
-  subnet_id = aws_subnet.rancher2-a-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
+  subnet_id = aws_subnet.rancher2-a-private-subnet.id
   root_block_device {
     volume_size = 32
   }
   tags = {
     Name = "rancher2-a-worker"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = false
@@ -680,15 +947,15 @@ resource "aws_instance" "rancher2-b-worker" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
-  subnet_id = aws_subnet.rancher2-b-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
+  subnet_id = aws_subnet.rancher2-b-private-subnet.id
   root_block_device {
     volume_size = 32
   }
   tags = {
     Name = "rancher2-b-worker"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = false
@@ -701,19 +968,150 @@ resource "aws_instance" "rancher2-c-worker" {
   ami = data.aws_ami.latest-ubuntu.id
   instance_type = var.aws_instance_type_worker
   iam_instance_profile = aws_iam_instance_profile.rancher2-instance-profile.name
-  key_name = "rancher2-key-pair"
-  security_groups = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
-  subnet_id = aws_subnet.rancher2-c-subnet.id
-  associate_public_ip_address = true
+  key_name = aws_key_pair.rancher2-key-pair.key_name
+  vpc_security_group_ids = [aws_security_group.rancher2-sg.id,aws_security_group.rancher2-worker-sg.id,aws_security_group.rancher2-elasticsearch-sg.id]
+  subnet_id = aws_subnet.rancher2-c-private-subnet.id
   root_block_device {
     volume_size = 32
   }
   tags = {
     Name = "rancher2-c-worker"
+    Zone = "Private"
     "kubernetes.io/cluster/rancher-master" = "owned"
     role_rke = true
     role_etcd = false
     role_controlplane = false
     role_worker = true
   }
+}
+
+
+output "inventory" {
+  value = <<INVENTORY
+all:
+  children:
+    bastion:
+      hosts:
+        rancher2-bastion:
+          ansible_host: ${aws_instance.rancher2-bastion.public_ip}
+      vars:
+        ansible_user: ec2-user
+    rancher:
+      hosts:
+        rancher2-a-master:
+          ansible_host: ${aws_instance.rancher2-a-master.private_ip}
+          private_dns: ${aws_instance.rancher2-a-master.private_dns}
+          private_ip: ${aws_instance.rancher2-a-master.private_ip}
+        rancher2-b-master:
+          ansible_host: ${aws_instance.rancher2-b-master.private_ip}
+          private_dns: ${aws_instance.rancher2-b-master.private_dns}
+          private_ip: ${aws_instance.rancher2-b-master.private_ip}
+        rancher2-c-master:
+          ansible_host: ${aws_instance.rancher2-c-master.private_ip}
+          private_dns: ${aws_instance.rancher2-c-master.private_dns}
+          private_ip: ${aws_instance.rancher2-c-master.private_ip}
+        rancher2-a-worker:
+          ansible_host: ${aws_instance.rancher2-a-worker.private_ip}
+          private_dns: ${aws_instance.rancher2-a-worker.private_dns}
+          private_ip: ${aws_instance.rancher2-a-worker.private_ip}
+        rancher2-b-worker:
+          ansible_host: ${aws_instance.rancher2-b-worker.private_ip}
+          private_dns: ${aws_instance.rancher2-b-worker.private_dns}
+          private_ip: ${aws_instance.rancher2-b-worker.private_ip}
+        rancher2-c-worker:
+          ansible_host: ${aws_instance.rancher2-c-worker.private_ip}
+          private_dns: ${aws_instance.rancher2-c-worker.private_dns}
+          private_ip: ${aws_instance.rancher2-c-worker.private_ip}
+      vars:
+        ansible_user: ubuntu
+  vars:
+    ansible_connection: ssh
+    ansible_port: 22
+
+INVENTORY
+}
+
+output "rancher-template" {
+  value = <<RANCHER_TEMPLATE
+cloud_provider:
+  _comment: cf https://github.com/rancher/rancher/issues/24329
+  awsCloudProvider:
+    global:
+      disable-security-group-ingress: false
+      disable-strict-zone-check: false
+  name: aws
+nodes:
+- address: ${aws_instance.rancher2-a-master.private_ip}
+  hostname_override: rancher2-a-master
+  role:
+  - controlplane
+  - etcd
+  - worker
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+  user: ubuntu
+- address: ${aws_instance.rancher2-b-master.private_ip}
+  hostname_override: rancher2-b-master
+  role:
+  - controlplane
+  - etcd
+  - worker
+  ssh_key_path: ~/.ssh/aws
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+- address: ${aws_instance.rancher2-c-master.private_ip}
+  hostname_override: rancher2-c-master
+  role:
+  - controlplane
+  - etcd
+  - worker
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+  user: ubuntu
+- address: ${aws_instance.rancher2-a-worker.private_ip}
+  hostname_override: rancher2-a-worker
+  labels:
+    elasticsearch: reserved
+  role:
+  - worker
+  ssh_key_path: ~/.ssh/aws
+  taints:
+  - effect: NoSchedule
+    key: node.elasticsearch.io/unschedulable
+    value: ''
+  user: ubuntu
+- address: ${aws_instance.rancher2-b-worker.private_ip}
+  hostname_override: rancher2-b-worker
+  labels:
+    elasticsearch: reserved
+  role:
+  - worker
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+  taints:
+  - effect: NoSchedule
+    key: node.elasticsearch.io/unschedulable
+    value: ''
+  user: ubuntu
+- address: ${aws_instance.rancher2-c-worker.private_ip}
+  hostname_override: rancher2-c-worker
+  labels:
+    elasticsearch: reserved
+  role:
+  - worker
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+  taints:
+  - effect: NoSchedule
+    key: node.elasticsearch.io/unschedulable
+    value: ''
+  user: ubuntu
+services:
+  etcd:
+    creation: 6h
+    retention: 24h
+    snapshot: true
+
+bastion_host:
+  address: ${aws_instance.rancher2-bastion.public_ip}
+  hostname_override: rancher2-bastion
+  ssh_key_path: ${var.rancher_id_rsa_pub_path}
+  user: ec2-user
+
+  RANCHER_TEMPLATE
 }

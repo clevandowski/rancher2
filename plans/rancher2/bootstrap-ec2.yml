@@ -1,0 +1,126 @@
+- name: Configure and install tools for rancher hosts
+  hosts: rancher
+  become: yes
+  tasks:
+  - name: Add docker Apt signing key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+      state: present
+
+  - name: remove old docker (as 1.12) if installed
+    apt:
+      name: docker-engine
+      state: absent
+      purge: true
+
+  - name: Install docker 19.03.5
+    apt:
+      name: docker-ce=5:19.03.5~3-0~ubuntu-bionic
+      update_cache: yes
+      force_apt_get: yes
+      state: present
+
+  - name: Remove useless packages from the cache
+    apt:
+      autoclean: yes
+
+  - name: Remove dependencies that are no longer required
+    apt:
+      autoremove: yes
+
+  - name: Prevent docker-ce from being upgraded.
+    dpkg_selections:
+      name: docker-ce
+      selection: hold
+
+  - name: Add user ubuntu to group docker
+    user:
+      name: ubuntu
+      groups: docker
+      append: yes
+
+  - name: Tasks when new instances
+    block:
+      - name: Rancher2 prepare - Install required kernel modules
+        shell: |
+          for module in br_netfilter ip6_udp_tunnel ip_set ip_set_hash_ip ip_set_hash_net iptable_filter iptable_nat iptable_mangle iptable_raw nf_conntrack_netlink nf_conntrack nf_conntrack_ipv4   nf_defrag_ipv4 nf_nat nf_nat_ipv4 nf_nat_masquerade_ipv4 nfnetlink udp_tunnel veth vxlan x_tables xt_addrtype xt_conntrack xt_comment xt_mark xt_multiport xt_nat xt_recent xt_set  xt_statistic xt_tcpudp;
+          do
+          if ! lsmod | grep -q $module; then
+          echo "module $module is not present";
+          modprobe $module;
+          echo "module $module installed";
+          fi;
+          done
+
+      - name: Rancher2 prepare - net.bridge.bridge-nf-call-iptables=1
+        sysctl:
+          name: net.bridge.bridge-nf-call-iptables
+          value: '1'
+          sysctl_set: yes
+
+      - name: Set understandable hostname
+        hostname:
+          name: "{{ inventory_hostname }}"
+        register: "hostname_status"
+
+      - name: Unconditionally reboot the machine with all defaults
+        reboot:
+        when: hostname_status.changed
+
+    when: ansible_hostname != inventory_hostname
+
+
+- name: Install tools on bastion host
+  hosts: bastion
+  vars:
+    kubectl_version: v1.17.2
+    helm_version: v2.16.3
+    rke_version: v1.0.4
+  tasks:
+    - name: Create local directories
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - "~/.local/bin"
+        - "~/.local/lib"
+        - "~/.local/lib/helm"
+        - "~/Downloads"
+        - - "~/.kube"
+
+    - name: Download and install kubectl
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: "~/.local/bin"
+        mode: 0755
+
+    - name: Download and install rke
+      get_url:
+        url: "https://github.com/rancher/rke/releases/download/{{ rke_version }}/rke_linux-amd64"
+        dest: "~/.local/bin/rke"
+        mode: 0755
+
+    - name: Download helm
+      get_url:
+        url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+        dest: "~/Downloads"
+        mode: 0644
+
+    - name: Install helm
+      unarchive:
+        remote_src: yes
+        src: "~/Downloads/helm-{{ helm_version }}-linux-amd64.tar.gz"
+        dest: "~/.local/lib/helm"
+
+    - name: Add helm and tiller to path
+      file:
+        src: "~/.local/lib/helm/linux-amd64/{{ item }}"
+        dest: "~/.local/bin/{{ item }}"
+        state: link
+      with_items:
+        - helm
+        - tiller
