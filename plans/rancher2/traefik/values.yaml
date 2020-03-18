@@ -1,0 +1,50 @@
+## Default values for Traefik
+image: traefik
+imageTag: 1.7.20
+imagePullPolicy: IfNotPresent
+replicas: 1
+serviceType: "LoadBalancer"
+debug:
+  enabled: true
+rbac:
+  enabled: false
+ssl:
+  enabled: true
+  enforced: false
+  permanentRedirect: true
+  insecureSkipVerify: true
+  generateTLS: true
+  defaultCN: "*.cyrille.aws.zenika.com"
+acme:
+  enabled: true
+  keyType: RSA4096
+  email: "cyrille.levandowski@gmail.com"
+  onHostRule: true
+  # staging: true
+  logging: true
+  # Pas possible de faire le challenge tls-alpn-01 pour un certificat wildcard
+  # cf https://letsencrypt.org/fr/docs/challenge-types/
+  # challengeType: "tls-alpn-01"
+  challengeType: "dns-01"
+  delayBeforeCheck: 60
+  domains:
+    enabled: true
+    domainsList:
+    - main: "*.cyrille.aws.zenika.com"
+  # dnsProvider:
+  #   name: route53
+  #   route53:
+  #     AWS_ACCESS_KEY_ID: ...
+  #     AWS_SECRET_ACCESS_KEY: ...
+  #     AWS_REGION: us-east-1
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    storageClass: aws.pg2.default
+dashboard:
+  enabled: true
+  domain: "traefik.cyrille.aws.zenika.com"
+  # auth:
+  #   basic:
+  #     cyrille: picsou

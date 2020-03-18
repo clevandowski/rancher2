@@ -1,0 +1,67 @@
+---
+  defaultImage: true
+  imageTag: "1.7.14"
+  serviceType: "LoadBalancer"
+  debug: 
+    enabled: true
+  rbac: 
+    enabled: true
+  ssl: 
+    enabled: true
+    enforced: true
+    permanentRedirect: true
+  acme: 
+    enabled: true
+    keyType: RSA4096
+    email: "cyrille.levandowski@gmail.com"
+    onHostRule: true
+    staging: true
+    logging: true
+    challengeType: "tls-alpn-01"
+    domains.domainsList.main: "*.cyrille.aws.zenika.com"
+  persistence: 
+    enabled: true
+  dashboard: 
+    enabled: true
+    domain: "traefik.cyrille.aws.zenika.com"
+    auth: 
+      basic: ""
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    field.cattle.io/creatorId: user-wcw6x
+    field.cattle.io/ingressState: '{"a2liYW5hL2RlZmF1bHQva2liYW5hLmN5cmlsbGUuYXdzLnplbmlrYS5jb20vLzU2MDE=":""}'
+    field.cattle.io/publicEndpoints: '[{"addresses":["13.48.43.173","13.48.85.50","13.53.125.243","13.53.206.84","13.53.216.106","13.53.44.206"],"port":80,"protocol":"HTTP","serviceName":"default:kibana-kibana","ingressName":"default:kibana","hostname":"kibana.cyrille.aws.zenika.com","allNodes":false}]'
+  creationTimestamp: "2020-01-31T22:51:30Z"
+  generation: 1
+  labels:
+    app: traefik
+    cattle.io/creator: norman
+    chart: traefik-1.0.0
+    heritage: Tiller
+    io.cattle.field/appId: traefik
+    release: traefik
+  name: kibana
+  namespace: default
+  resourceVersion: "42091"
+  selfLink: /apis/extensions/v1beta1/namespaces/default/ingresses/kibana
+  uid: d33fdce0-cacb-4c01-a797-ddf6d42f4539
+spec:
+  rules:
+  - host: kibana.cyrille.aws.zenika.com
+    http:
+      paths:
+      - backend:
+          serviceName: kibana-kibana
+          servicePort: 5601
+status:
+  loadBalancer:
+    ingress:
+    - ip: 13.48.43.173
+    - ip: 13.48.85.50
+    - ip: 13.53.125.243
+    - ip: 13.53.206.84
+    - ip: 13.53.216.106
+    - ip: 13.53.44.206

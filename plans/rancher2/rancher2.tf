@@ -459,14 +459,14 @@ resource "aws_security_group" "rancher2-elasticsearch-sg" {
     protocol = "tcp"
   }
   tags = {
-    Name = "rancher2-worker-sg"
+    Name = "rancher2-elasticsearch-sg"
   }
 }
 
-resource "aws_internet_gateway" "rancher2-gw" {
+resource "aws_internet_gateway" "rancher2-igw" {
   vpc_id = aws_vpc.rancher2-vpc.id
   tags = {
-    Name = "rancher2-gw"
+    Name = "rancher2-igw"
   }
 }
 
@@ -474,7 +474,7 @@ resource "aws_route_table" "rancher2-rt" {
   vpc_id = aws_vpc.rancher2-vpc.id
   route {
     cidr_block = var.egress_ip
-    gateway_id = aws_internet_gateway.rancher2-gw.id
+    gateway_id = aws_internet_gateway.rancher2-igw.id
   }
   tags = {
     Name = "rancher2-rt"

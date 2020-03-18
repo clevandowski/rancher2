@@ -19,7 +19,7 @@ export RANCHER_LB_DNS_HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name | j
 export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
 
 create_default_storageclass_on_current_aws_region() {
-  kubectl --kubeconfig $KUBECONFIG apply -f - <<COINCOIN
+  kubectl apply -f - <<COINCOIN
     kind: StorageClass
     apiVersion: storage.k8s.io/v1
     metadata:
