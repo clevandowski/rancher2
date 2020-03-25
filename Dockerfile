@@ -1,6 +1,6 @@
 FROM ubuntu:18.04
 
-ENV HELM_VERSION v2.16.1
+ENV HELM_VERSION v3.1.2
 # ENV RKE_VERSION v1.0.0
 
 RUN apt-get update \

@@ -59,4 +59,8 @@ install_rancher2() {
 provision_cloud_cluster \
 && bootstrap_ec2_instances \
 && provision_rke_cluster \
-&& install_rancher2
+&& install_rancher2 \
+
+if [ -f custom_bastion_provisionning.sh ]; then
+  ./custom_bastion_provisionning.sh
+fi

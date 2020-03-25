@@ -11,39 +11,27 @@
     - name: Check Cluster is UP & RUNNING
       shell: "{{ local_bin_dir }}/kubectl get node"
 
-    - name: Install HELM
+    - name: Init Helm
       block:
-        - name: kubectl create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-          shell: "{{ local_bin_dir }}/kubectl create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller"
-
-        - name: kubectl -n kube-system create serviceaccount tiller
-          shell: "{{ local_bin_dir }}/kubectl -n kube-system create serviceaccount tiller"
-
-        - name: helm init --service-account tiller
-          shell: "{{ local_bin_dir }}/helm init --service-account tiller"
-
-        - name:  kubectl -n kube-system rollout status deploy/tiller-deploy
-          shell: "{{ local_bin_dir }}/kubectl -n kube-system rollout status deploy/tiller-deploy"
-
-        - name: helm version
-          shell: "{{ local_bin_dir }}/helm version"
+        - name: helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+          shell: "{{ local_bin_dir }}/helm repo add stable https://kubernetes-charts.storage.googleapis.com/"
 
     - name: Install Cert Manager
       block:
         - name: kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml
           shell: "{{ local_bin_dir }}/kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml"
 
-        - name:  kubectl create namespace cert-manager
-          shell: "{{ local_bin_dir }}/kubectl create namespace cert-manager"
+        - name: kubectl create namespace cert-manager
+          shell: "if ! {{ local_bin_dir }}/kubectl get namespace cert-manager; then {{ local_bin_dir }}/kubectl create namespace cert-manager; fi"
 
-        - name:  helm repo add jetstack https://charts.jetstack.io
+        - name: helm repo add jetstack https://charts.jetstack.io
           shell: "{{ local_bin_dir }}/helm repo add jetstack https://charts.jetstack.io"
 
-        - name:  helm repo update
+        - name: helm repo update
           shell: "{{ local_bin_dir }}/helm repo update"
 
-        - name: helm install --name cert-manager --namespace cert-manager --version v0.12.0 jetstack/cert-manager
-          shell: "{{ local_bin_dir }}/helm install --name cert-manager --namespace cert-manager --version v0.12.0 jetstack/cert-manager"
+        - name: helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.12.0
+          shell: "if ! {{ local_bin_dir }}/helm status -n cert-manager cert-manager; then {{ local_bin_dir }}/helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.12.0; fi"
 
         - name: kubectl -n cert-manager rollout status deploy/cert-manager
           shell: "{{ local_bin_dir }}/kubectl -n cert-manager rollout status deploy/cert-manager"
@@ -59,11 +47,14 @@
 
     - name: Install Rancher2
       block:
-        - name:  helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+        - name: helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
           shell: "{{ local_bin_dir }}/helm repo add rancher-stable https://releases.rancher.com/server-charts/stable"
 
-        - name: helm install rancher-stable/rancher --name rancher --namespace cattle-system --set hostname=xxxxx
-          shell: "{{ local_bin_dir }}/helm install rancher-stable/rancher --name rancher --namespace cattle-system --set hostname={{ rancher_lb_dns }}"
+        - name: kubectl create namespace cattle-system
+          shell: "if ! {{ local_bin_dir }}/kubectl get namespace cattle-system; then {{ local_bin_dir }}/kubectl create namespace cattle-system; fi"
+
+        - name: install rancher rancher-stable/rancher --namespace cattle-system --set hostname={{ rancher_lb_dns }}
+          shell: "if ! {{ local_bin_dir }}/helm status -n cattle-system rancher; then {{ local_bin_dir }}/helm install rancher rancher-stable/rancher --namespace cattle-system --set hostname={{ rancher_lb_dns }}; fi"
 
         - name: kubectl -n cattle-system rollout status deploy/rancher
           shell: "{{ local_bin_dir }}/kubectl -n cattle-system rollout status deploy/rancher"

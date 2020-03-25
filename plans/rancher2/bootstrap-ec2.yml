@@ -32,7 +32,7 @@
     apt:
       autoremove: yes
 
-  - name: Prevent docker-ce from being upgraded.
+  - name: Prevent docker-ce from being upgraded
     dpkg_selections:
       name: docker-ce
       selection: hold
@@ -78,7 +78,7 @@
   hosts: bastion
   vars:
     kubectl_version: v1.17.2
-    helm_version: v2.16.3
+    helm_version: v3.1.2
     rke_version: v1.0.4
   tasks:
     - name: Create local directories
@@ -116,11 +116,8 @@
         src: "~/Downloads/helm-{{ helm_version }}-linux-amd64.tar.gz"
         dest: "~/.local/lib/helm"
 
-    - name: Add helm and tiller to path
+    - name: Add helm to path
       file:
-        src: "~/.local/lib/helm/linux-amd64/{{ item }}"
-        dest: "~/.local/bin/{{ item }}"
+        src: "~/.local/lib/helm/linux-amd64/helm"
+        dest: "~/.local/bin/helm"
         state: link
-      with_items:
-        - helm
-        - tiller
