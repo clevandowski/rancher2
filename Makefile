@@ -11,6 +11,7 @@ build:
 		--build-arg GROUP_ID=$$GROUP_ID \
 		--build-arg GROUP_NAME=$$GROUP_NAME \
 		.
+	echo "Build finished, never push this image"
 
 run: build
 	docker container run --rm -ti \

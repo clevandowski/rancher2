@@ -1,6 +1,6 @@
 #!/bin/bash
 
-helm del --purge traefik
+helm del traefik
 # kubectl --namespace elasticsearch delete pvc es-rancher-master-es-rancher-master-0
 
 if kubectl get ingress kibana 2>/dev/null; then

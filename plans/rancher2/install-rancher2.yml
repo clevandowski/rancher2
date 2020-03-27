@@ -59,7 +59,7 @@
         - name: kubectl -n cattle-system rollout status deploy/rancher
           shell: "{{ local_bin_dir }}/kubectl -n cattle-system rollout status deploy/rancher"
 
-        - name: create storage class for aws-ebs.
+        - name: create storage class for aws-ebs
           shell: |
             {{ local_bin_dir }}/kubectl apply -f - <<COINCOIN
               kind: StorageClass

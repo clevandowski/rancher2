@@ -10,7 +10,7 @@ rbac:
   enabled: false
 ssl:
   enabled: true
-  enforced: false
+  enforced: true
   permanentRedirect: true
   insecureSkipVerify: true
   generateTLS: true

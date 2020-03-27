@@ -79,7 +79,7 @@
   vars:
     kubectl_version: v1.17.2
     helm_version: v3.1.2
-    rke_version: v1.0.4
+    rke_version: v1.0.5
   tasks:
     - name: Create local directories
       file:
