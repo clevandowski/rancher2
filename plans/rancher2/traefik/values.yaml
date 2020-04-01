@@ -48,3 +48,11 @@ dashboard:
   # auth:
   #   basic:
   #     cyrille: picsou
+
+metrics:
+  prometheus:
+    enabled: true
+
+service:
+  annotations:
+    "service.beta.kubernetes.io/aws-load-balancer-type": "nlb"
