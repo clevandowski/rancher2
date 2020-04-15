@@ -1,0 +1,20 @@
+{
+  "cloud_provider": {
+    "_comment": "cf https://github.com/rancher/rancher/issues/24329",
+    "awsCloudProvider": {
+      "global": {
+        "disable-security-group-ingress": false,
+        "disable-strict-zone-check": false
+      }
+    },
+    "name": "aws"
+  },
+  "services": {
+    "etcd": {
+      "snapshot": true,
+      "creation": "6h",
+      "retention": "24h"
+    }
+  },
+  "nodes": []
+}

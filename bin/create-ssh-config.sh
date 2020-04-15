@@ -12,7 +12,6 @@ mapAwsPrivateHostsToHostsIps() {
     local instanceIp=$(echo ${instance} | cut -d : -f 2)
     PRIVATE_INSTANCES[$instanceName]=$instanceIp
   done
-  
 }
 
 mapAwsSubnetCidrToHostIps() {

@@ -15,39 +15,21 @@ if [ -z "$AWS_PROFILE" ] || [ -z "$AWS_REGION" ] || [ -z "$RANCHER_LB_DNS" ]; th
   exit 1
 fi
 
-provision_cloud_cluster() {
-  # Provision cluster VM sur cloud
-  terraform init
-  if terraform validate; then
-    terraform plan \
-      -var aws_profile="$AWS_PROFILE" \
-      -var aws_region="$AWS_REGION" \
-      -var authorized_ip="$PUBLIC_IP/32" \
-      -var rancher_lb_dns="$RANCHER_LB_DNS" \
-      -var rancher_hosted_zone_id="$RANCHER_LB_DNS_HOSTED_ZONE_ID" \
-      -out rancher2.plan
-  else
-    return 1
-  fi
-
-  if terraform apply -auto-approve rancher2.plan; then
-    terraform show
-  else
-    echo "Error in terraform apply"
-    return 1
-  fi
-}
+. _provision_cloud_cluster.sh
 
 # Préparation Rancher2
 bootstrap_ec2_instances() {
-  inventory-template.sh && create-ssh-config.sh
+  ./inventory-template.sh && create-ssh-config.sh
   ansible-playbook bootstrap-ec2.yml
 }
 
 # Create kubernetes cluster via RKE
 provision_rke_cluster() {
-  rancher-cluster-template.sh
+  ./rke-rancher-cluster-template.sh rancher2 rancher-cluster.yml
   rke up --config ./rancher-cluster.yml
+
+  ./rke-dev-cluster-template.sh dev dev-cluster.yml
+  rke up --config ./dev-cluster.yml
 }
 
 # Install rancher2 over RKE.
@@ -56,10 +38,12 @@ install_rancher2() {
 }
 
 # Main
-provision_cloud_cluster \
-&& bootstrap_ec2_instances \
-&& provision_rke_cluster \
-&& install_rancher2 \
+if ! provision_cloud_cluster \
+    && bootstrap_ec2_instances \
+    && provision_rke_cluster \
+    && install_rancher2; then
+  echo "[ERROR] Installation failed"
+fi
 
 if [ -f custom_bastion_provisionning.sh ]; then
   ./custom_bastion_provisionning.sh

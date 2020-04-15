@@ -3,7 +3,7 @@
 set -eo pipefail
 
 export ROOT_DNS="aws.zenika.com"
-export TRAEFIK_LB_DNS="*.cyrille.aws.zenika.com"
+export TRAEFIK_LB_DNS="*.master.cyrille.aws.zenika.com"
 export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq -r ".HostedZones[] | select(.Name==\"${ROOT_DNS}.\") | .Id" | sed -e 's|^.*/\([^/]*\)$|\1|')
 
 getLoadBalancerDNS() {
@@ -77,6 +77,6 @@ kubectl -n default rollout status deploy/traefik
 echo "Creating DNS Recordset $TRAEFIK_LB_DNS on internal traefik DNS"
 createAliasRecordSet "$HOSTED_ZONE_ID" "$TRAEFIK_LB_DNS"
 
-if ! kubectl get service kibana-kibana 2>/dev/null; then
+if kubectl get service kibana-kibana 2>/dev/null; then
   kubectl apply -f kibana-ingress.yml
 fi

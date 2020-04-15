@@ -7,7 +7,7 @@ metadata:
     kubernetes.io/ingress.class: traefik
 spec:
   rules:
-  - host: kibana.cyrille.aws.zenika.com
+  - host: kibana.master.cyrille.aws.zenika.com
     http:
       paths:
       - path: ""

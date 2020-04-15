@@ -14,7 +14,7 @@ ssl:
   permanentRedirect: true
   insecureSkipVerify: true
   generateTLS: true
-  defaultCN: "*.cyrille.aws.zenika.com"
+  defaultCN: "*.master.cyrille.aws.zenika.com"
 acme:
   enabled: true
   keyType: RSA4096
@@ -30,7 +30,7 @@ acme:
   domains:
     enabled: true
     domainsList:
-    - main: "*.cyrille.aws.zenika.com"
+    - main: "*.master.cyrille.aws.zenika.com"
   # dnsProvider:
   #   name: route53
   #   route53:
@@ -44,7 +44,7 @@ acme:
     storageClass: aws.pg2.default
 dashboard:
   enabled: true
-  domain: "traefik.cyrille.aws.zenika.com"
+  domain: "traefik.master.cyrille.aws.zenika.com"
   # auth:
   #   basic:
   #     cyrille: picsou

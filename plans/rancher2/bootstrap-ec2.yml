@@ -1,5 +1,5 @@
 - name: Configure and install tools for rancher hosts
-  hosts: rancher
+  hosts: rancher,dev
   become: yes
   tasks:
   - name: Add docker Apt signing key
@@ -45,9 +45,9 @@
 
   - name: Tasks when new instances
     block:
-      - name: Rancher2 prepare - Install required kernel modules
+      - name: RKE prepare - Install required kernel modules
         shell: |
-          for module in br_netfilter ip6_udp_tunnel ip_set ip_set_hash_ip ip_set_hash_net iptable_filter iptable_nat iptable_mangle iptable_raw nf_conntrack_netlink nf_conntrack nf_conntrack_ipv4   nf_defrag_ipv4 nf_nat nf_nat_ipv4 nf_nat_masquerade_ipv4 nfnetlink udp_tunnel veth vxlan x_tables xt_addrtype xt_conntrack xt_comment xt_mark xt_multiport xt_nat xt_recent xt_set  xt_statistic xt_tcpudp;
+          for module in br_netfilter ip6_udp_tunnel ip_set ip_set_hash_ip ip_set_hash_net iptable_filter iptable_nat iptable_mangle iptable_raw nf_conntrack_netlink nf_conntrack nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat nf_nat_ipv4 nf_nat_masquerade_ipv4 nfnetlink udp_tunnel veth vxlan x_tables xt_addrtype xt_conntrack xt_comment xt_mark xt_multiport xt_nat xt_recent xt_set  xt_statistic xt_tcpudp;
           do
           if ! lsmod | grep -q $module; then
           echo "module $module is not present";
@@ -56,7 +56,7 @@
           fi;
           done
 
-      - name: Rancher2 prepare - net.bridge.bridge-nf-call-iptables=1
+      - name: RKE prepare - net.bridge.bridge-nf-call-iptables=1
         sysctl:
           name: net.bridge.bridge-nf-call-iptables
           value: '1'
@@ -69,7 +69,7 @@
 
       - name: Unconditionally reboot the machine with all defaults
         reboot:
-        when: hostname_status.changed
+        # when: hostname_status.changed
 
     when: ansible_hostname != inventory_hostname
 
