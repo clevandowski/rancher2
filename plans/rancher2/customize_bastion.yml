@@ -15,6 +15,10 @@
       copy:
         src: "traefik"
         dest: "~"
+    - name: Recursively set execute permission to .sh files
+      shell: |
+        find ~ -name "*.sh" -type f | while read shell_script; do chmod 755 $shell_script; done
+       
     - name: Install tools
       become: yes
       yum:
@@ -23,7 +27,7 @@
         - jq
         state: present
 
-    - name: Create user config
+    - name: Create aws and kubectl config in .bashrc
       shell: |
         echo "export AWS_PROFILE=clevandowski-ops-zenika" >> .bashrc
         echo "export AWS_REGION=eu-north-1" >> .bashrc
