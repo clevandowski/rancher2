@@ -13,9 +13,7 @@ provision_cloud_cluster() {
     return 1
   fi
 
-  if terraform apply -auto-approve rancher2.plan; then
-    terraform show
-  else
+  if ! terraform apply -auto-approve rancher2.plan; then
     echo "Error in terraform apply"
     return 1
   fi

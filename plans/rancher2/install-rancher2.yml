@@ -3,13 +3,18 @@
   vars:
     local_bin_dir: "~/.local/bin"
   tasks:
-    - name: Upload kube_config file
+    - name: Upload rancher2 master kube_config file
       copy:
         src: "kube_config_rancher-cluster.yml"
         dest: "~/.kube/config"
 
+    - name: Upload dev kube_config file
+      copy:
+        src: "kube_config_dev-cluster.yml"
+        dest: "~/kube_config_dev-cluster.yml"
+
     - name: Check Cluster is UP & RUNNING
-      shell: "{{ local_bin_dir }}/kubectl get node"
+      shell: "{{ local_bin_dir }}/kubectl get nodes"
 
     - name: Init Helm
       block:
@@ -59,7 +64,7 @@
         - name: kubectl -n cattle-system rollout status deploy/rancher
           shell: "{{ local_bin_dir }}/kubectl -n cattle-system rollout status deploy/rancher"
 
-        - name: create storage class for aws-ebs
+        - name: Create storage class for aws-ebs
           shell: |
             {{ local_bin_dir }}/kubectl apply -f - <<COINCOIN
               kind: StorageClass
@@ -79,3 +84,4 @@
 
         - name: get rancher admin password
           shell: "{{ local_bin_dir }}/kubectl -n cattle-system exec $(kubectl -n cattle-system get pods -l app=rancher | grep '1/1' | head -1 | awk '{ print $1 }') -- reset-password | tail -n 1 > rancher_admin_password.txt"
+

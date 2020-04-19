@@ -1,2 +1,11 @@
 helm-charts
 setenv.sh
+sandbox.yml
+rancher-cluster.*
+dev-cluster.*
+.rancher-cli-noscope
+README.md
+inventory.yml
+kube_config_*.yml
+manifests
+rancher_admin_password.txt

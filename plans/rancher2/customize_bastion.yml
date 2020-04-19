@@ -1,0 +1,30 @@
+- name: Install custom conf on bastion (only for volatile bastion, don't keep this instance alive after user)
+  hosts: bastion
+  vars:
+    local_bin_dir: "~/.local/bin"
+  tasks:
+    - name: Upload aws cli conf
+      copy:
+        src: "~/.aws"
+        dest: "~"
+    - name: Upload elasticsearch provisionning script
+      copy:
+        src: "elasticsearch"
+        dest: "~"
+    - name: Upload traefik provisionning script
+      copy:
+        src: "traefik"
+        dest: "~"
+    - name: Install tools
+      become: yes
+      yum:
+        name:
+        - git
+        - jq
+        state: present
+
+    - name: Create user config
+      shell: |
+        echo "export AWS_PROFILE=clevandowski-ops-zenika" >> .bashrc
+        echo "export AWS_REGION=eu-north-1" >> .bashrc
+        echo "export KUBECONFIG=$HOME/.kube/config:$HOME/kube_config_dev-cluster.yml" >> .bashrc

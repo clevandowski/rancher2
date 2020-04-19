@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-cd ~/plans/rancher2
-export KUBECONFIG=$(pwd)/kube_config_rancher-cluster.yml
+cd $(dirname $0)
+source config.sh
 
 . _remove_cloud_cluster.sh
 
@@ -20,18 +20,4 @@ remove_k8s_cluster() {
   fi
 }
 
-# remove_cloud_cluster() {
-#   terraform destroy -auto-approve -var aws_profile="$AWS_PROFILE" -var aws_region="$AWS_REGION"
-# }
-
 remove_k8s_cluster && remove_cloud_cluster
-
-# rm -rf .terraform \
-#   terraform.tfstate* \
-#   ssh_config* \
-#   terraform.tfstate* \
-#   rancher-cluster.* \
-#   inventory.yml \
-#   kube_config_rancher-cluster.yml \
-#   rancher2.plan \
-#   rancher_admin_password.txt

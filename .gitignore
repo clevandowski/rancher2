@@ -2,14 +2,6 @@
 **/*.plan
 **/*.tfstate*
 .gitignore.swp
-plans/rancher2/sandbox.yml
-plans/rancher2/rancher-cluster.*
-plans/rancher2/.rancher-cli-noscope
-plans/rancher2/README.md
-plans/rancher2/inventory.yml
-plans/rancher2/kube_config_rancher-cluster.yml
-plans/rancher2/manifests
-plans/rancher2/rancher_admin_password.txt
 **/terraform.tfvars
 **/*ssh_config*
 *.iml
