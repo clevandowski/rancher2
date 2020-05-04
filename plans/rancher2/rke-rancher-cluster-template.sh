@@ -105,3 +105,4 @@ process_jq_template() {
 extract_tfstate_id_rsa
 process_jq_template | envsubst | json2yaml.sh > $OUTPUT_FILENAME
 append_bastion_host
+echo "cluster_name: $CLUSTER_NAME" >> $OUTPUT_FILENAME

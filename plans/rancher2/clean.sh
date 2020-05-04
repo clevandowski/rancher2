@@ -6,6 +6,7 @@ rm -rf .terraform \
    ssh_config* \
    terraform.tfstate* \
    rancher-cluster.* \
+   dev-cluster.* \
    inventory.yml \
    kube_config_rancher-cluster.yml \
    rancher2.plan \

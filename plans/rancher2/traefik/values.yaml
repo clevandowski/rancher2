@@ -15,22 +15,22 @@ ssl:
   insecureSkipVerify: true
   generateTLS: true
   defaultCN: "*.master.cyrille.aws.zenika.com"
-acme:
-  enabled: true
-  keyType: RSA4096
-  email: "cyrille.levandowski@gmail.com"
-  onHostRule: true
-  # staging: true
-  logging: true
-  # Pas possible de faire le challenge tls-alpn-01 pour un certificat wildcard
-  # cf https://letsencrypt.org/fr/docs/challenge-types/
-  # challengeType: "tls-alpn-01"
-  challengeType: "dns-01"
-  delayBeforeCheck: 60
-  domains:
-    enabled: true
-    domainsList:
-    - main: "*.master.cyrille.aws.zenika.com"
+# acme:
+#   enabled: true
+#   keyType: RSA4096
+#   email: "cyrille.levandowski@gmail.com"
+#   onHostRule: true
+#   # staging: true
+#   logging: true
+#   # Pas possible de faire le challenge tls-alpn-01 pour un certificat wildcard
+#   # cf https://letsencrypt.org/fr/docs/challenge-types/
+#   # challengeType: "tls-alpn-01"
+#   challengeType: "dns-01"
+#   delayBeforeCheck: 60
+#   domains:
+#     enabled: true
+#     domainsList:
+#     - main: "*.master.cyrille.aws.zenika.com"
   # dnsProvider:
   #   name: route53
   #   route53:
